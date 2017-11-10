@@ -3,3 +3,4 @@ composer.lock
 vendor/
 dev/
 _tests/
+.idea/

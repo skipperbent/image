@@ -2,10 +2,7 @@
 
 namespace Intervention\Image\Gd;
 
-use \Intervention\Gif\Decoder as GifDecoder;
-use \Intervention\Image\Image;
-use \Intervention\Image\Size;
-use \Intervention\Image\ContainerInterface;
+use Intervention\Image\Image;
 
 class Decoder extends \Intervention\Image\AbstractDecoder
 {
@@ -17,49 +14,62 @@ class Decoder extends \Intervention\Image\AbstractDecoder
      */
     public function initFromPath($path)
     {
-        $info = @getimagesize($path);
-
-        if ($info === false) {
+        if ( ! file_exists($path)) {
             throw new \Intervention\Image\Exception\NotReadableException(
-                "Unable to read image from file ({$path})."
+                "Unable to find file ({$path})."
             );
         }
 
-        // try to decode animated gif
-        if ($info['mime'] == 'image/gif') {
-            
-            $image = $this->initFromBinary(file_get_contents($path));
+        // get mime type of file
+        $mime = finfo_file(finfo_open(FILEINFO_MIME_TYPE), $path);
 
-        } else {
-
-            // define core
-            switch ($info[2]) {
-                case IMAGETYPE_PNG:
-                $core = imagecreatefrompng($path);
-                Helper::gdResourceToTruecolor($core);
+        // define core
+        switch (strtolower($mime)) {
+            case 'image/png':
+            case 'image/x-png':
+                $core = @imagecreatefrompng($path);
                 break;
 
-                case IMAGETYPE_JPEG:
-                $core = imagecreatefromjpeg($path);
-                Helper::gdResourceToTruecolor($core);
+            case 'image/jpg':
+            case 'image/jpeg':
+            case 'image/pjpeg':
+                $core = @imagecreatefromjpeg($path);
+                if (!$core) {
+                    $core= @imagecreatefromstring(file_get_contents($path));
+                }
                 break;
 
-                case IMAGETYPE_GIF:
-                $core = imagecreatefromgif($path);
-                Helper::gdResourceToTruecolor($core);
+            case 'image/gif':
+                $core = @imagecreatefromgif($path);
                 break;
 
-                default:
-                throw new \Intervention\Image\Exception\NotReadableException(
-                    "Unable to read image type. GD driver is only able to decode JPG, PNG or GIF files."
+            case 'image/webp':
+            case 'image/x-webp':
+                if ( ! function_exists('imagecreatefromwebp')) {
+                    throw new \Intervention\Image\Exception\NotReadableException(
+                        "Unsupported image type. GD/PHP installation does not support WebP format."
                     );
-            }
+                }
+                $core = @imagecreatefromwebp($path);
+                break;
 
-            // build image
-            $image = $this->initFromGdResource($core);
+            default:
+                throw new \Intervention\Image\Exception\NotReadableException(
+                    "Unsupported image type. GD driver is only able to decode JPG, PNG, GIF or WebP files."
+                );
         }
 
-        $image->mime = $info['mime'];
+        if (empty($core)) {
+            throw new \Intervention\Image\Exception\NotReadableException(
+                "Unable to decode image from file ({$path})."
+            );
+        }
+
+        $this->gdResourceToTruecolor($core);
+
+        // build image
+        $image = $this->initFromGdResource($core);
+        $image->mime = $mime;
         $image->setFileInfoFromPath($path);
 
         return $image;
@@ -73,17 +83,7 @@ class Decoder extends \Intervention\Image\AbstractDecoder
      */
     public function initFromGdResource($resource)
     {
-        $driver = new Driver;
-        
-        return new Image($driver, $driver->newContainer($resource));
-    }
-
-
-    public function initFromContainer(Container $container)
-    {
-        $driver = new Driver;
-
-        return new Image($driver, $container);
+        return new Image(new Driver, $resource);
     }
 
     /**
@@ -107,43 +107,47 @@ class Decoder extends \Intervention\Image\AbstractDecoder
      */
     public function initFromBinary($binary)
     {
-        try {
-            // try to custom decode gif
-            $gifDecoder = new GifDecoder;
-            $decoded = $gifDecoder->initFromData($binary)->decode();
+        $resource = @imagecreatefromstring($binary);
 
-            // create image
-            $container = Container::initFromDecoded($decoded);
-            $image = $this->initFromContainer($container);
-            $image->mime = 'image/gif';
-
-        } catch (\Exception $e) {
-            
-            $resource = @imagecreatefromstring($binary);    
-
-            if ($resource === false) {
-                throw new \Intervention\Image\Exception\NotReadableException(
-                    "Unable to init from given binary data."
-                );
-            }
-
-            // create image
-            $image = $this->initFromGdResource($resource);
-            $image->mime = finfo_buffer(finfo_open(FILEINFO_MIME_TYPE), $binary);
-
+        if ($resource === false) {
+            throw new \Intervention\Image\Exception\NotReadableException(
+                "Unable to init from given binary data."
+            );
         }
+
+        $image = $this->initFromGdResource($resource);
+        $image->mime = finfo_buffer(finfo_open(FILEINFO_MIME_TYPE), $binary);
 
         return $image;
     }
 
     /**
-     * Initiates new image from container object
+     * Transform GD resource into Truecolor version
      *
-     * @param  ContainerInterface $container
-     * @return \Intervention\Image\Image
+     * @param  resource $resource
+     * @return bool
      */
-    public function initFromInterventionContainer(ContainerInterface $container)
+    public function gdResourceToTruecolor(&$resource)
     {
-        return new Image(new Driver, $container);
+        $width = imagesx($resource);
+        $height = imagesy($resource);
+
+        // new canvas
+        $canvas = imagecreatetruecolor($width, $height);
+
+        // fill with transparent color
+        imagealphablending($canvas, false);
+        $transparent = imagecolorallocatealpha($canvas, 255, 255, 255, 127);
+        imagefilledrectangle($canvas, 0, 0, $width, $height, $transparent);
+        imagecolortransparent($canvas, $transparent);
+        imagealphablending($canvas, true);
+
+        // copy original
+        imagecopy($canvas, $resource, 0, 0, 0, 0, $width, $height);
+        imagedestroy($resource);
+
+        $resource = $canvas;
+
+        return true;
     }
 }

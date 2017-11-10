@@ -2,7 +2,7 @@
 
 namespace Intervention\Image\Gd\Commands;
 
-use \Intervention\Image\Gd\Color;
+use Intervention\Image\Gd\Color;
 
 class TrimCommand extends ResizeCommand
 {
@@ -27,9 +27,9 @@ class TrimCommand extends ResizeCommand
 
         // define borders to trim away
         if (is_null($away)) {
-            $away = array('top', 'right', 'bottom', 'left');
+            $away = ['top', 'right', 'bottom', 'left'];
         } elseif (is_string($away)) {
-            $away = array($away);
+            $away = [$away];
         }
 
         // lower border names

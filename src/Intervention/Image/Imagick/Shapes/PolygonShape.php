@@ -2,8 +2,8 @@
 
 namespace Intervention\Image\Imagick\Shapes;
 
-use \Intervention\Image\Image;
-use \Intervention\Image\Imagick\Color;
+use Intervention\Image\Image;
+use Intervention\Image\Imagick\Color;
 
 class PolygonShape extends \Intervention\Image\AbstractShape
 {
@@ -64,13 +64,13 @@ class PolygonShape extends \Intervention\Image\AbstractShape
      */
     private function formatPoints($points)
     {
-        $ipoints = array();
+        $ipoints = [];
         $count = 1;
 
         foreach ($points as $key => $value) {
             if ($count%2 === 0) {
                 $y = $value;
-                $ipoints[] = array('x' => $x, 'y' => $y);
+                $ipoints[] = ['x' => $x, 'y' => $y];
             } else {
                 $x = $value;
             }

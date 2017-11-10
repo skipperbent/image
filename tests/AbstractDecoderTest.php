@@ -1,20 +1,18 @@
 <?php
 
-use \Intervention\Image\AbstractDecoder;
-
 class AbstractDecoderTest extends PHPUnit_Framework_TestCase
 {
     public function tearDown()
     {
         Mockery::close();
     }
-    
+
     public function testIsImagick()
     {
-        $source = $this->getTestDecoder(new \Imagick);
+        $source = $this->getTestDecoder(new Imagick());
         $this->assertTrue($source->isImagick());
 
-        $source = $this->getTestDecoder(new StdClass);
+        $source = $this->getTestDecoder(new stdClass);
         $this->assertFalse($source->isImagick());
 
         $source = $this->getTestDecoder(null);
@@ -42,10 +40,10 @@ class AbstractDecoderTest extends PHPUnit_Framework_TestCase
         $source = $this->getTestDecoder(null);
         $this->assertFalse($source->isFilepath());
 
-        $source = $this->getTestDecoder(array());
+        $source = $this->getTestDecoder([]);
         $this->assertFalse($source->isFilepath());
 
-        $source = $this->getTestDecoder(new StdClass);
+        $source = $this->getTestDecoder(new stdClass);
         $this->assertFalse($source->isFilepath());
     }
 
@@ -61,6 +59,9 @@ class AbstractDecoderTest extends PHPUnit_Framework_TestCase
     public function testIsStream()
     {
         $source = $this->getTestDecoder(fopen(__DIR__ . '/images/test.jpg', 'r'));
+        $this->assertTrue($source->isStream());
+
+        $source = $this->getTestDecoder(new \GuzzleHttp\Psr7\Stream(fopen(__DIR__ . '/images/test.jpg', 'r')));
         $this->assertTrue($source->isStream());
 
         $source = $this->getTestDecoder(null);
@@ -81,10 +82,10 @@ class AbstractDecoderTest extends PHPUnit_Framework_TestCase
         $source = $this->getTestDecoder(0);
         $this->assertFalse($source->isBinary());
 
-        $source = $this->getTestDecoder(array(1,2,3));
+        $source = $this->getTestDecoder([1,2,3]);
         $this->assertFalse($source->isBinary());
 
-        $source = $this->getTestDecoder(new StdClass);
+        $source = $this->getTestDecoder(new stdClass);
         $this->assertFalse($source->isBinary());
     }
 
@@ -145,6 +146,6 @@ class AbstractDecoderTest extends PHPUnit_Framework_TestCase
 
     public function getTestDecoder($data)
     {
-        return $this->getMockForAbstractClass('\Intervention\Image\AbstractDecoder', array($data));
+        return $this->getMockForAbstractClass('\Intervention\Image\AbstractDecoder', [$data]);
     }
 }

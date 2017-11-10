@@ -2,8 +2,7 @@
 
 namespace Intervention\Image\Imagick;
 
-use \Intervention\Image\Image;
-use \Intervention\Image\Size;
+use Intervention\Image\Image;
 
 class Font extends \Intervention\Image\AbstractFont
 {
@@ -17,172 +16,103 @@ class Font extends \Intervention\Image\AbstractFont
      */
     public function applyToImage(Image $image, $posx = 0, $posy = 0)
     {
+        // build draw object
         $draw = new \ImagickDraw();
+        $draw->setStrokeAntialias(true);
+        $draw->setTextAntialias(true);
 
+        // set font file
         if ($this->hasApplicableFontFile()) {
-            $draw->setStrokeAntialias(true);
-            $draw->setTextAntialias(true);
-                
-            // font file
             $draw->setFont($this->file);
-
-            // font size
-            $draw->setFontSize($this->size);
-
-            // parse text color
-            $color = new Color($this->color);
-            $draw->setFillColor($color->getPixel());
-
         } else {
             throw new \Intervention\Image\Exception\RuntimeException(
                 "Font file must be provided to apply text to image."
             );
         }
 
-        // format text
-        $text = $this->format();
+        // parse text color
+        $color = new Color($this->color);
 
-        // box size
-        $box = $this->isBoxed() ? $this->box : $this->getBoxSize($text);
+        $draw->setFontSize($this->size);
+        $draw->setFillColor($color->getPixel());
 
-        // create empty canvas
-        $canvas = $image->getDriver()->newImage(
-            $box->getWidth() + self::PADDING * 2,
-            $box->getHeight() + self::PADDING * 2
-        )->getCore();
+        // align horizontal
+        switch (strtolower($this->align)) {
+            case 'center':
+                $align = \Imagick::ALIGN_CENTER;
+                break;
 
-        $lines = $this->getLines($text);
+            case 'right':
+                $align = \Imagick::ALIGN_RIGHT;
+                break;
 
-        $baseline = $this->getCoreBoxSize($lines[0]);
+            default:
+                $align = \Imagick::ALIGN_LEFT;
+                break;
+        }
 
-        $box->align(sprintf('%s-%s', $this->align, 'top'));
+        $draw->setTextAlignment($align);
 
-        $ystart = 0;
+        // align vertical
+        if (strtolower($this->valign) != 'bottom') {
 
-        if ($this->isBoxed()) {
+            // calculate box size
+            $dimensions = $image->getCore()->queryFontMetrics($draw, $this->text);
+
+            // corrections on y-position
             switch (strtolower($this->valign)) {
-                case 'bottom':
-                    $ystart = $box->getHeight() - $this->getBoxSize($text)->getHeight();
-                    break;
-                
                 case 'center':
                 case 'middle':
-                    $ystart = ($box->getHeight() - $this->getBoxSize($text)->getHeight()) / 2;
+                    $posy = $posy + $dimensions['textHeight'] * 0.65 / 2;
+                    break;
+
+                case 'top':
+                    $posy = $posy + $dimensions['textHeight'] * 0.65;
                     break;
             }
         }
 
-        // write line by line
-        foreach ($lines as $count => $line) {
+        // apply to image
+        $image->getCore()->annotateImage($draw, $posx, $posy, $this->angle * (-1), $this->text);
+    }
 
-            $linesize = $this->getCoreBoxSize(trim($line));
-            $relative = $box->relativePosition($linesize->align($this->align));
+    /**
+     * Calculates bounding box of current font setting
+     *
+     * @return array
+     */
+    public function getBoxSize()
+    {
+        $box = [];
 
-            // write line of text
-            $canvas->annotateImage(
-                $draw, 
-                self::PADDING + $relative->x, // x
-                self::PADDING + $ystart + $baseline->getHeight() + $count * $this->lineHeight * $this->size * 1.5, // y
-                0, // angle
-                trim($line)
+        // build draw object
+        $draw = new \ImagickDraw();
+        $draw->setStrokeAntialias(true);
+        $draw->setTextAntialias(true);
+
+        // set font file
+        if ($this->hasApplicableFontFile()) {
+            $draw->setFont($this->file);
+        } else {
+            throw new \Intervention\Image\Exception\RuntimeException(
+                "Font file must be provided to apply text to image."
             );
         }
 
-        // valign
-        switch (strtolower($this->valign)) {
-            case 'top':
-            # nothing to do...
-            break;
-
-            case 'center':
-            case 'middle':
-            $box->pivot->moveY($box->getHeight() / 2);
-            break;
-
-            case 'bottom':
-            $box->pivot->moveY($box->getHeight());
-            break;
-
-            default:
-            case 'baseline':
-            $box->pivot->moveY($baseline->getHeight());
-            break;
-        }
-
-        if ($this->isBoxed()) {
-            $box->align('top-left');
-        }
-
-        // rotate canvas
-        if ($this->angle != 0) {
-            $canvas->rotateImage(new \ImagickPixel('none'), ($this->angle * -1));
-            $box->rotate($this->angle);
-        }
-
-        // insert canvas
-        foreach ($image as $frame) {
-            $frame->getCore()->compositeImage(
-                $canvas,
-                \Imagick::COMPOSITE_DEFAULT,
-                $posx - $box->pivot->x - self::PADDING,
-                $posy - $box->pivot->y - self::PADDING
-            );    
-        }
-
-        
-    }
-
-    /**
-     * Calculate boxsize including own features
-     *
-     * @param  string $text
-     * @return \Intervention\Image\Size
-     */
-    public function getBoxSize($text = null)
-    {
-        $text = is_null($text) ? $this->text : $text;
-
-        $lines = $this->getLines($text);
-        $baseline = $this->getCoreBoxSize($lines[0]);
-
-        $width_values = array();
-
-        // cycle through each line
-        foreach ($lines as $line) {
-            $width_values[] = $this->getCoreBoxSize($line)->getWidth();
-        }
-
-        // maximal line width is box width
-        $width = max($width_values);
-
-        // calculate height
-        $height = $baseline->getHeight() + (count($lines) - 1) * $this->lineHeight * $this->size * 1.5;
-        $height = $height + $baseline->getHeight() / 3;
-
-        return new Size($width, $height);
-    }
-
-    /**
-     * Get raw boxsize without any non-core features
-     *
-     * @param  string $text
-     * @return \Intervention\Image\Size
-     */
-    protected function getCoreBoxSize($text = null)
-    {
-        $text = is_null($text) ? $this->text : $text;
-
-        $imagick = new \Imagick();
-        $draw = new \ImagickDraw();
-
-        $draw->setStrokeAntialias(true);
-        $draw->setTextAntialias(true);
         $draw->setFontSize($this->size);
-        $draw->setFont($this->file);
 
-        // get boxsize
-        $size = $imagick->queryFontMetrics($draw, $text);
+        $dimensions = (new \Imagick())->queryFontMetrics($draw, $this->text);
 
-        return new Size($size['textWidth'], $size['textHeight']);
+        if (strlen($this->text) == 0) {
+            // no text -> no boxsize
+            $box['width'] = 0;
+            $box['height'] = 0;
+        } else {
+            // get boxsize
+            $box['width'] = intval(abs($dimensions['textWidth']));
+            $box['height'] = intval(abs($dimensions['textHeight']));
+        }
+
+        return $box;
     }
 }

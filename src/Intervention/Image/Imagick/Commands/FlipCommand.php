@@ -14,23 +14,12 @@ class FlipCommand extends \Intervention\Image\Commands\AbstractCommand
     {
         $mode = $this->argument(0)->value('h');
 
-        $methodName = $this->modeIsVertical($mode) ? 'flipImage' : 'flopImage';
-
-        foreach ($image as $frame) {
-            call_user_func(array($frame->getCore(), $methodName));
+        if (in_array(strtolower($mode), [2, 'v', 'vert', 'vertical'])) {
+            // flip vertical
+            return $image->getCore()->flipImage();
+        } else {
+            // flip horizontal
+            return $image->getCore()->flopImage();
         }
-
-        return true;
-    }
-
-    /**
-     * Check if mode is vertical
-     *
-     * @param  mixed $mode
-     * @return bool
-     */
-    private function modeIsVertical($mode)
-    {
-        return in_array(strtolower($mode), array(2, 'v', 'vert', 'vertical'));
     }
 }

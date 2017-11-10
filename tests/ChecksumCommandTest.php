@@ -8,16 +8,19 @@ class ChecksumCommandTest extends PHPUnit_Framework_TestCase
     {
         Mockery::close();
     }
-    
+
     public function testExecute()
     {
+        $size = Mockery::mock('Intervention\Image\Size', [3, 3]);
+        $color = [0,0,0,1];
+        $resource = imagecreatefrompng(__DIR__.'/images/tile.png');
         $image = Mockery::mock('Intervention\Image\Image');
-        $image->shouldReceive('encode')->once()->andReturn('encoded_image_data');
-
-        $command = new ChecksumCommand(array());
+        $image->shouldReceive('getSize')->once()->andReturn($size);
+        $image->shouldReceive('pickColor')->times(9)->andReturn($color);
+        $command = new ChecksumCommand([]);
         $result = $command->execute($image);
         $this->assertTrue($result);
         $this->assertTrue($command->hasOutput());
-        $this->assertEquals(md5('encoded_image_data'), $command->getOutput());
+        $this->assertEquals('ec9cbdb71be04e26b4a89333f20c273b', $command->getOutput());
     }
 }
