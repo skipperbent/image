@@ -2,6 +2,8 @@
 
 namespace Intervention\Image\Commands;
 
+use Intervention\Image\Image;
+
 class OrientateCommand extends AbstractCommand
 {
     /**
@@ -12,7 +14,13 @@ class OrientateCommand extends AbstractCommand
      */
     public function execute($image)
     {
-        switch ($image->exif('Orientation')) {
+        $orientation = $image->exif('Orientation');
+
+        if($orientation instanceof Image) {
+            return false;
+        }
+
+        switch ($orientation) {
 
             case 2:
                 $image->flip();
